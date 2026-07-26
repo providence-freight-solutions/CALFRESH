@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#0B0E11">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Dispatch">
+<meta name="apple-mobile-web-app-title" content="Cal Fresh">
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon-192.png">
-<title>Providence Dispatch — Load Console</title>
+<title>Cal Fresh Dispatch — Load Console</title>
 <style>
   :root{
     --ink:#0B0E11; --panel:#141A20; --sunk:#0E1216;
@@ -155,7 +155,7 @@
 <div class="wrap">
 
   <header>
-    <h1>Providence Dispatch</h1>
+    <h1>Cal Fresh Dispatch</h1>
     <p class="sub">Rate confirmations in, dispatched loads out.</p>
     <nav>
       <button id="tabNew" class="ghost">New load</button>
@@ -290,6 +290,10 @@
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
         </select>
+        <select id="filterDriver" style="width:auto;border:1px solid var(--rule);background:var(--sunk)">
+          <option value="">All drivers</option>
+        </select>
+        <button class="ghost mini" id="clearFilters">Clear</button>
         <span class="status" id="listStatus">Sign in to load.</span>
       </div>
       <div class="scroll" id="listBox"><div class="empty">Nothing loaded yet.</div></div>
@@ -846,6 +850,18 @@ function renderDrivers(){
 /* -------------------------------- loads -------------------------------- */
 $('refresh').onclick = () => loadList();
 $('filterStatus').onchange = () => loadList();
+$('filterDriver').onchange = () => loadList();
+$('clearFilters').onclick = () => {
+  $('filterStatus').value = ''; $('filterDriver').value = ''; loadList();
+};
+
+/* keep the driver filter in sync with the roster without losing the choice */
+function syncDriverFilter(){
+  const sel = $('filterDriver'), keep = sel.value;
+  sel.innerHTML = '<option value="">All drivers</option>' +
+    drivers.map(d => '<option value="' + d.id + '">' + esc(d.full_name) + '</option>').join('');
+  sel.value = keep;
+}
 
 const STATUSES = ['draft','unassigned','assigned','in_progress','delivered','completed','cancelled'];
 
@@ -854,12 +870,17 @@ async function loadList(){
   setStatus($('listStatus'), 'Loading…', 'busy');
   try {
     if (!drivers.length) await loadDrivers(true);
-    const f = $('filterStatus').value;
+    syncDriverFilter();
+    const f = $('filterStatus').value, dv = $('filterDriver').value;
     const sel = 'id,broker_name,status,rate_total,assigned_driver_id,lane,first_appt,stop_count';
     const rows = await api('/rest/v1/load_summary?select=' + encodeURIComponent(sel) +
-                  (f ? '&status=eq.' + f : '') + '&order=first_appt.asc.nullslast&limit=200');
+                  (f ? '&status=eq.' + f : '') +
+                  (dv ? '&assigned_driver_id=eq.' + dv : '') +
+                  '&order=first_appt.asc.nullslast&limit=200');
     renderList(rows);
-    setStatus($('listStatus'), rows.length + ' load' + (rows.length===1?'':'s') + '.', 'ok');
+    const who = dv ? (drivers.find(d => d.id === dv) || {}).full_name : null;
+    setStatus($('listStatus'), rows.length + ' load' + (rows.length===1?'':'s') +
+      (who ? ' for ' + who : '') + '.', 'ok');
   } catch(e){ setStatus($('listStatus'), String(e.message), 'fail'); }
 }
 
@@ -949,24 +970,34 @@ async function loadBoard(){
     const box = $('boardBox');
     box.innerHTML = rows.length
       ? '<div class="board">' + rows.map(r =>
-          '<div class="card"><h3>' + esc(r.full_name) +
+          '<div class="card"><h3><span class="link drvfilter" data-id="' + r.driver_id + '">' +
+            esc(r.full_name) + '</span>' +
             (r.tractor_number ? ' <span style="color:var(--dim);font-weight:400">#' + esc(r.tractor_number) + '</span>' : '') +
           '</h3>' +
-          slot('Running now', r.current_broker, r.current_lane, r.current_first_appt) +
-          slot('Next up', r.next_broker, r.next_lane, r.next_first_appt) +
-          slot('Last delivered', r.last_broker, r.last_lane, r.last_delivered_appt) +
+          slot('Running now', r.current_broker, r.current_lane, r.current_first_appt, r.current_load_id) +
+          slot('Next up', r.next_broker, r.next_lane, r.next_first_appt, r.next_load_id) +
+          slot('Last delivered', r.last_broker, r.last_lane, r.last_delivered_appt, r.last_load_id) +
           '<div class="slot"><span class="k">Open loads</span><div class="v">' + (r.open_loads || 0) + '</div></div>' +
           '</div>').join('') + '</div>'
       : '<div class="empty">No drivers yet. Add one from the Drivers tab.</div>';
-    setStatus($('boardStatus'), rows.length + ' driver' + (rows.length===1?'':'s') + '.', 'ok');
+
+    box.querySelectorAll('.boardload').forEach(s => s.onclick = () => openEdit(s.dataset.id));
+    box.querySelectorAll('.drvfilter').forEach(s => s.onclick = () => {
+      $('filterDriver').value = s.dataset.id;
+      $('filterStatus').value = '';
+      show('List');
+    });
+
+    setStatus($('boardStatus'), rows.length + ' driver' + (rows.length===1?'':'s') +
+      '. Tap a name for their full history, or a load to edit it.', 'ok');
   } catch(e){ setStatus($('boardStatus'), String(e.message), 'fail'); }
 }
 
-function slot(k, broker, lane, appt){
-  const has = !!broker;
-  return '<div class="slot"><span class="k">' + k + '</span><div class="v' + (has ? '' : ' none') + '">' +
-    (has ? esc(broker) + '<br><span class="lane">' + esc(lane || '') + ' · ' + esc(fmtAppt(appt)) + '</span>' : 'nothing') +
-    '</div></div>';
+function slot(k, broker, lane, appt, loadId){
+  if (!broker) return '<div class="slot"><span class="k">' + k + '</span><div class="v none">nothing</div></div>';
+  return '<div class="slot"><span class="k">' + k + '</span><div class="v">' +
+    '<span class="link boardload" data-id="' + loadId + '">' + esc(broker) + '</span>' +
+    '<br><span class="lane">' + esc(lane || '') + ' · ' + esc(fmtAppt(appt)) + '</span></div></div>';
 }
 
 /* -------------------------------- export ------------------------------- */

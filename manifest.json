@@ -1,6 +1,6 @@
 {
-  "name": "Providence Dispatch Console",
-  "short_name": "Dispatch",
+  "name": "Cal Fresh Dispatch Console",
+  "short_name": "Cal Fresh",
   "description": "Rate confirmations in, dispatched loads out.",
   "start_url": "./index.html",
   "scope": "./",
