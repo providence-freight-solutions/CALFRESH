@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0E11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dispatch">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>Providence Dispatch — Load Console</title>
+<style>
+  :root{
+    --ink:#0B0E11; --panel:#141A20; --sunk:#0E1216;
+    --rule:#2A343E; --text:#DCE3EA; --dim:#7C8B99;
+    --sodium:#F0A22E; --ok:#4FB477; --fail:#E0574A;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;padding:env(safe-area-inset-top) 0 90px;background:var(--ink);color:var(--text);
+       font-family:var(--mono);font-size:13px;line-height:1.5}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+
+  header{border-bottom:2px solid var(--sodium);padding:20px 0 0;margin-bottom:20px}
+  h1{margin:0;font-family:var(--sans);font-size:14px;font-weight:700;
+     letter-spacing:.2em;text-transform:uppercase}
+  .sub{margin:4px 0 12px;color:var(--dim);font-size:11px;letter-spacing:.06em}
+  nav{display:flex;gap:2px;flex-wrap:wrap}
+  nav button{border-radius:0;background:transparent;color:var(--dim);
+             border:1px solid var(--rule);border-bottom:none;padding:8px 16px}
+  nav button.on{background:var(--sodium);color:#0B0E11;border-color:var(--sodium)}
+
+  fieldset{border:1px solid var(--rule);padding:0;margin:0 0 18px;min-width:0}
+  legend{font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.18em;
+         text-transform:uppercase;color:var(--sodium);padding:0 8px;margin-left:10px}
+  .row{display:grid;grid-template-columns:170px 1fr;border-top:1px solid var(--rule)}
+  .row:first-of-type{border-top:none}
+  .row > label{padding:9px 12px;background:#101519;border-right:1px solid var(--rule);
+    color:var(--dim);font-size:11px;letter-spacing:.05em;text-transform:uppercase;
+    display:flex;align-items:center}
+  input[type=text],input[type=password],input[type=number],input[type=date],
+  input[type=datetime-local],select,textarea{
+    border:none;background:transparent;color:var(--text);
+    font-family:var(--mono);font-size:16px;padding:9px 12px;width:100%;max-width:100%}
+  input[type=file]{padding:9px 12px;color:var(--text);font-family:var(--mono);font-size:12px;max-width:100%}
+  textarea{resize:vertical;min-height:86px;line-height:1.55}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--sodium);outline-offset:-2px}
+  select{appearance:none;cursor:pointer}
+  select option{background:var(--panel);color:var(--text)}
+  input::placeholder,textarea::placeholder{color:#4A5662}
+
+  button{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;padding:9px 18px;cursor:pointer;
+    background:var(--sodium);color:#0B0E11;border:none}
+  button:hover:not(:disabled){background:#FFB84D}
+  button:disabled{background:#2A343E;color:#5C6874;cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--dim);border:1px solid var(--rule)}
+  button.ghost:hover:not(:disabled){color:var(--text);border-color:var(--dim);background:transparent}
+  button.mini{padding:5px 10px;font-size:10px;letter-spacing:.1em}
+  button.danger{background:transparent;color:var(--fail);border:1px solid var(--rule)}
+  button.danger:hover:not(:disabled){border-color:var(--fail);background:transparent}
+
+  .actions{padding:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+           border-top:1px solid var(--rule)}
+  .status{font-size:11px;letter-spacing:.05em}
+  .status.ok{color:var(--ok)} .status.fail{color:var(--fail)} .status.busy{color:var(--sodium)}
+  .hint{color:var(--dim);font-size:11px;padding:10px 12px;border-top:1px solid var(--rule)}
+  code{color:var(--sodium)}
+
+  .banner{border:1px solid var(--sodium);background:#1A1509;padding:10px 12px;margin-bottom:18px;
+    display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .banner .t{font-family:var(--sans);font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--sodium)}
+
+  .rep{display:grid;gap:8px;padding:12px;border-top:1px solid var(--rule)}
+  .rep-line{display:grid;gap:8px;align-items:center}
+  .rep-line input,.rep-line select{border:1px solid var(--rule);background:var(--sunk)}
+  .ident-line{grid-template-columns:1fr 1.4fr auto}
+  .rate-line{grid-template-columns:1fr 150px auto}
+  .ref-line{grid-template-columns:1fr 1.4fr auto}
+
+  .stop{border:1px solid var(--rule);margin:12px;background:#10161B}
+  .stop-head{display:flex;justify-content:space-between;align-items:center;gap:8px;
+    padding:8px 12px;background:#131A20;border-bottom:1px solid var(--rule);flex-wrap:wrap}
+  .stop-title{font-family:var(--sans);font-size:11px;font-weight:700;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--sodium)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr}
+  .grid2 > .row{border-top:1px solid var(--rule)}
+  .grid2 > .row:nth-child(odd){border-right:1px solid var(--rule)}
+  .sub-legend{font-family:var(--sans);font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--dim);padding:10px 12px 0}
+
+  .flags{display:flex;gap:8px;flex-wrap:wrap;padding:12px 12px 0}
+  .flag{font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;padding:4px 9px;border:1px solid currentColor}
+  .flag.ok{color:var(--ok)} .flag.warn{color:var(--sodium)} .flag.bad{color:var(--fail)}
+  .notes{margin:12px;padding:12px;border-left:3px solid var(--sodium);background:#151A1E}
+  .notes h4{margin:0 0 6px;font-family:var(--sans);font-size:10px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--sodium)}
+  .notes ul{margin:0;padding-left:18px;color:var(--dim);font-size:12px}
+
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--dim);text-align:left;
+    padding:9px 12px;border-bottom:1px solid var(--rule);background:#101519;white-space:nowrap}
+  td{padding:8px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+  td select{border:1px solid var(--rule);background:var(--sunk);padding:5px 8px;font-size:12px;min-width:120px}
+  .pill{font-family:var(--sans);font-size:9px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;padding:3px 8px;border:1px solid currentColor;white-space:nowrap}
+  .st-unassigned{color:var(--sodium)} .st-assigned{color:var(--ok)}
+  .st-draft{color:var(--dim)} .st-in_progress{color:var(--ok)}
+  .st-delivered,.st-completed{color:var(--dim)} .st-cancelled{color:var(--fail)}
+  .lane{color:var(--dim)}
+  .money{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .link{color:var(--sodium);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  .empty{padding:28px 12px;color:var(--dim);text-align:center}
+  .hide{display:none}
+  .rowbtns{display:flex;gap:6px;flex-wrap:wrap}
+
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;padding:12px}
+  .card{border:1px solid var(--rule);background:#10161B}
+  .card h3{margin:0;padding:9px 12px;background:#131A20;border-bottom:1px solid var(--rule);
+    font-family:var(--sans);font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+  .card .slot{padding:8px 12px;border-bottom:1px solid var(--rule)}
+  .card .slot:last-child{border-bottom:none}
+  .slot .k{font-family:var(--sans);font-size:9px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--dim)}
+  .slot .v.none{color:#4A5662}
+
+  #installBar{position:fixed;left:0;right:0;bottom:0;background:#131A20;
+    border-top:1px solid var(--sodium);padding:10px 16px;display:none;
+    justify-content:space-between;align-items:center;gap:12px;z-index:50;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+
+  @media (max-width:760px){
+    .wrap{padding:0 10px}
+    .row{grid-template-columns:1fr}
+    .row > label{border-right:none;border-bottom:1px solid var(--rule)}
+    .grid2{grid-template-columns:1fr}
+    .grid2 > .row:nth-child(odd){border-right:none}
+    .ident-line,.rate-line,.ref-line{grid-template-columns:1fr}
+    nav button{flex:1 1 30%;padding:9px 6px;font-size:10px;letter-spacing:.08em}
+    th,td{padding:7px 8px}
+    .no-sm{display:none}
+    .stop{margin:8px}
+    .actions{padding:10px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Providence Dispatch</h1>
+    <p class="sub">Rate confirmations in, dispatched loads out.</p>
+    <nav>
+      <button id="tabNew" class="ghost">New load</button>
+      <button id="tabList" class="ghost">Loads</button>
+      <button id="tabBoard" class="ghost">Board</button>
+      <button id="tabDrivers" class="ghost">Drivers</button>
+      <button id="tabExport" class="ghost">Billing</button>
+      <button id="tabConn" class="on">Account</button>
+    </nav>
+  </header>
+
+  <!-- ============================ CONNECTION ============================ -->
+  <section id="paneConn">
+    <fieldset>
+      <legend>Sign in</legend>
+      <div class="row"><label for="email">Email</label>
+        <input type="text" id="email" autocomplete="username" placeholder="Shamus@ProvidenceFreight.com"></div>
+      <div class="row"><label for="pw">Password</label>
+        <input type="password" id="pw" autocomplete="current-password"></div>
+      <div class="actions">
+        <button id="signin">Sign in</button>
+        <button class="ghost mini" id="toggleAdv">Server settings</button>
+        <span class="status" id="authStatus">Not signed in.</span>
+      </div>
+      <div id="advBox" class="hide">
+        <div class="row"><label for="url">Project URL</label><input type="text" id="url"></div>
+        <div class="row"><label for="anon">Anon key</label><input type="text" id="anon"></div>
+        <div class="hint">Only change these if you point the app at a different project.</div>
+      </div>
+    </fieldset>
+  </section>
+
+  <!-- ============================== NEW LOAD ============================= -->
+  <section id="paneNew" class="hide">
+
+    <div id="editBanner" class="banner hide">
+      <span class="t">Editing an existing load</span>
+      <span><button class="ghost mini" id="cancelEdit">Cancel edit</button></span>
+    </div>
+
+    <fieldset id="parseBox">
+      <legend>Start from a rate confirmation <span style="color:var(--dim)">— optional</span></legend>
+      <div class="row"><label for="file">PDF file</label>
+        <input type="file" id="file" accept="application/pdf"></div>
+      <div class="actions">
+        <button id="parse">Upload &amp; parse</button>
+        <button class="ghost" id="clear">Clear form</button>
+        <span class="status" id="parseStatus">Skip this to enter a load by hand.</span>
+      </div>
+      <div class="flags" id="flags"></div>
+      <div id="notesBox"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Broker</legend>
+      <div class="row"><label for="b_name">Broker name *</label><input type="text" id="b_name"></div>
+      <div class="row"><label for="b_contact">Contact</label><input type="text" id="b_contact"></div>
+      <div class="row"><label for="b_phone">Phone</label><input type="text" id="b_phone"></div>
+      <div class="row"><label for="b_email">Email</label><input type="text" id="b_email"></div>
+      <div class="row"><label for="b_after">After hours</label><input type="text" id="b_after"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Load identifiers</legend>
+      <div class="rep" id="identRows"></div>
+      <div class="actions"><button class="ghost mini" id="addIdent">+ Identifier</button>
+        <span class="status">First one becomes the invoice number.</span></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Freight</legend>
+      <div class="grid2">
+        <div class="row"><label for="equip">Equipment</label><input type="text" id="equip"></div>
+        <div class="row"><label for="commodity">Commodity</label><input type="text" id="commodity"></div>
+        <div class="row"><label for="tmin">Temp min °F</label><input type="number" id="tmin" step="0.1"></div>
+        <div class="row"><label for="tmax">Temp max °F</label><input type="number" id="tmax" step="0.1"></div>
+        <div class="row"><label for="weight">Total weight lb</label><input type="number" id="weight" step="0.01"></div>
+        <div class="row"><label for="pallets">Total pallets</label><input type="number" id="pallets"></div>
+      </div>
+      <div class="row"><label for="tnote">Temp note</label><input type="text" id="tnote"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Pay <span style="color:var(--dim)">— never shown to drivers</span></legend>
+      <div class="rep" id="rateRows"></div>
+      <div class="actions"><button class="ghost mini" id="addRate">+ Pay line</button></div>
+      <div class="row"><label for="rateTotal">Total</label><input type="number" id="rateTotal" step="0.01" placeholder="auto-summed"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Tracking</legend>
+      <div class="row"><label for="trackReq">Required</label>
+        <select id="trackReq"><option value="false">No</option><option value="true">Yes</option></select></div>
+      <div class="row"><label for="trackPlat">Platform</label><input type="text" id="trackPlat"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Special instructions</legend>
+      <div style="padding:12px"><textarea id="special"></textarea></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Stops</legend>
+      <div id="stopRows"></div>
+      <div class="actions">
+        <button class="ghost mini" id="addPickup">+ Pickup</button>
+        <button class="ghost mini" id="addDelivery">+ Delivery</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Save</legend>
+      <div class="actions">
+        <button id="save">Create load</button>
+        <span class="status" id="saveStatus">Sign in to save.</span>
+      </div>
+    </fieldset>
+  </section>
+
+  <!-- =============================== LOADS ============================== -->
+  <section id="paneList" class="hide">
+    <fieldset>
+      <legend>All loads</legend>
+      <div class="actions">
+        <button class="ghost mini" id="refresh">Refresh</button>
+        <select id="filterStatus" style="width:auto;border:1px solid var(--rule);background:var(--sunk)">
+          <option value="">All statuses</option>
+          <option value="unassigned">Unassigned</option>
+          <option value="assigned">Assigned</option>
+          <option value="in_progress">In progress</option>
+          <option value="delivered">Delivered</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <span class="status" id="listStatus">Sign in to load.</span>
+      </div>
+      <div class="scroll" id="listBox"><div class="empty">Nothing loaded yet.</div></div>
+    </fieldset>
+  </section>
+
+  <!-- =============================== BOARD ============================== -->
+  <section id="paneBoard" class="hide">
+    <fieldset>
+      <legend>Driver board</legend>
+      <div class="actions"><button class="ghost mini" id="refreshBoard">Refresh</button>
+        <span class="status" id="boardStatus">Sign in to load.</span></div>
+      <div id="boardBox"><div class="empty">Nothing loaded yet.</div></div>
+    </fieldset>
+  </section>
+
+  <!-- ============================== DRIVERS ============================= -->
+  <section id="paneDrivers" class="hide">
+    <fieldset>
+      <legend>Add a driver</legend>
+      <div class="grid2">
+        <div class="row"><label for="d_name">Full name *</label><input type="text" id="d_name"></div>
+        <div class="row"><label for="d_email">Email *</label><input type="text" id="d_email"></div>
+        <div class="row"><label for="d_phone">Mobile</label><input type="text" id="d_phone"></div>
+        <div class="row"><label for="d_pw">Temp password *</label><input type="text" id="d_pw" placeholder="8+ characters"></div>
+        <div class="row"><label for="d_tractor">Tractor #</label><input type="text" id="d_tractor"></div>
+        <div class="row"><label for="d_trailer">Trailer #</label><input type="text" id="d_trailer"></div>
+      </div>
+      <div class="actions">
+        <button id="createDriver">Create driver</button>
+        <button class="ghost mini" id="genPw">Generate password</button>
+        <span class="status" id="driverStatus">Sign in first.</span>
+      </div>
+      <div class="hint">Write the password down before leaving this page. It cannot be read back.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Roster</legend>
+      <div class="actions"><button class="ghost mini" id="refreshDrivers">Refresh</button>
+        <span class="status" id="rosterStatus"></span></div>
+      <div class="scroll" id="driverBox"><div class="empty">Nothing loaded yet.</div></div>
+    </fieldset>
+  </section>
+
+  <!-- ============================== BILLING ============================= -->
+  <section id="paneExport" class="hide">
+    <fieldset>
+      <legend>QuickBooks export</legend>
+      <div class="grid2">
+        <div class="row"><label for="x_from">Delivered from</label><input type="date" id="x_from"></div>
+        <div class="row"><label for="x_to">Delivered to</label><input type="date" id="x_to"></div>
+      </div>
+      <div class="actions">
+        <button id="preview">Preview</button>
+        <button class="ghost" id="download" disabled>Download CSV</button>
+        <span class="status" id="exportStatus">Sign in to load.</span>
+      </div>
+      <div class="hint">Only <code>delivered</code> and <code>completed</code> loads appear.</div>
+      <div class="scroll" id="exportBox"></div>
+    </fieldset>
+  </section>
+
+</div>
+
+<div id="installBar">
+  <span style="font-size:11px;color:var(--dim)">Install this on your home screen</span>
+  <span><button class="mini" id="installBtn">Install</button>
+        <button class="ghost mini" id="installDismiss">Not now</button></span>
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG — fill ANON_KEY in once, then the app only asks for a password.
+   The anon key is safe to publish; row level security is what protects
+   the data. Never put the service_role key here.
+   ===================================================================== */
+const CONFIG = {
+  PROJECT_URL: 'https://vlkposqrvobehuzmfitp.supabase.co',
+  ANON_KEY: ''      //  <-- paste your anon key between the quotes
+};
+
+const $ = id => document.getElementById(id);
+let token = null, drivers = [], exportRows = [], editingId = null, lastPath = null, totalTouched = false;
+
+/* ------------------------------- helpers ------------------------------- */
+const base = () => ($('url').value || CONFIG.PROJECT_URL).trim().replace(/\/+$/, '');
+const anon = () => ($('anon').value || CONFIG.ANON_KEY).trim();
+const val  = el => { const v = (el?.value ?? '').trim(); return v === '' ? null : v; };
+const num  = el => { const v = val(el); return v === null ? null : Number(v); };
+const int  = el => { const v = val(el); return v === null ? null : parseInt(v, 10); };
+const dt   = el => { const v = val(el); return v === null ? null : (v.length === 16 ? v + ':00' : v); };
+const esc  = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+$('url').value = CONFIG.PROJECT_URL;
+$('anon').value = CONFIG.ANON_KEY;
+
+function setStatus(el, msg, kind){ el.textContent = msg; el.className = 'status' + (kind ? ' ' + kind : ''); }
+function headers(){ return { 'apikey': anon(), 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
+function el(tag, cls, html){ const n = document.createElement(tag); if (cls) n.className = cls; if (html !== undefined) n.innerHTML = html; return n; }
+
+async function api(path, opts){
+  const r = await fetch(base() + path, Object.assign({ headers: headers() }, opts || {}));
+  const txt = await r.text();
+  let d = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
+  if (!r.ok) throw new Error((d && (d.message || d.error || d.hint)) || ('HTTP ' + r.status));
+  return d;
+}
+
+function fmtAppt(iso, tz){
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('en-US', {
+      timeZone: tz || 'America/Los_Angeles',
+      month:'2-digit', day:'2-digit', hour:'numeric', minute:'2-digit'
+    });
+  } catch { return iso; }
+}
+
+/* UTC timestamp -> the naive local string a datetime-local input wants,
+   rendered in the stop's own timezone so editing never shifts an appt. */
+function toLocalInput(iso, tz){
+  if (!iso) return '';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz || 'America/Los_Angeles', year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', hour12:false
+  }).formatToParts(new Date(iso));
+  const g = t => (parts.find(p => p.type === t) || {}).value;
+  let h = g('hour'); if (h === '24') h = '00';
+  return g('year') + '-' + g('month') + '-' + g('day') + 'T' + h + ':' + g('minute');
+}
+
+/* --------------------------------- tabs -------------------------------- */
+const panes = {
+  New:['tabNew','paneNew'], List:['tabList','paneList'], Board:['tabBoard','paneBoard'],
+  Drivers:['tabDrivers','paneDrivers'], Export:['tabExport','paneExport'], Conn:['tabConn','paneConn']
+};
+function show(which){
+  for (const k in panes){
+    const [tab, pane] = panes[k];
+    const on = k === which;
+    $(tab).className = on ? 'on' : 'ghost';
+    $(pane).className = on ? '' : 'hide';
+  }
+  window.scrollTo(0,0);
+  if (!token) return;
+  if (which === 'List') loadList();
+  if (which === 'Board') loadBoard();
+  if (which === 'Drivers') loadDrivers();
+}
+Object.keys(panes).forEach(k => $(panes[k][0]).onclick = () => show(k));
+show('Conn');
+
+$('toggleAdv').onclick = () => $('advBox').classList.toggle('hide');
+
+/* -------------------------------- sign in ------------------------------ */
+$('signin').onclick = async () => {
+  if (!anon()) { $('advBox').classList.remove('hide');
+    return setStatus($('authStatus'), 'No anon key set. Add it under Server settings.', 'fail'); }
+  setStatus($('authStatus'), 'Signing in…', 'busy');
+  $('signin').disabled = true;
+  try {
+    const r = await fetch(base() + '/auth/v1/token?grant_type=password', {
+      method:'POST', headers:{ 'apikey': anon(), 'Content-Type':'application/json' },
+      body: JSON.stringify({ email: val($('email')), password: $('pw').value })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error_description || d.msg || d.error || 'Sign-in failed');
+    token = d.access_token;
+    setStatus($('authStatus'), 'Signed in.', 'ok');
+    ['saveStatus','parseStatus','driverStatus'].forEach(i => setStatus($(i), 'Ready.', ''));
+    await loadDrivers(true);
+    show('List');
+  } catch(e){
+    token = null;
+    setStatus($('authStatus'), String(e.message), 'fail');
+  } finally { $('signin').disabled = false; }
+};
+
+/* --------------------------- repeatable rows --------------------------- */
+function addIdentRow(d){
+  d = d || {};
+  const line = el('div','rep-line ident-line');
+  line.innerHTML = '<input type="text" class="i-label" placeholder="Pro #">' +
+    '<input type="text" class="i-value" placeholder="175292">' +
+    '<button class="danger mini" type="button">Remove</button>';
+  line.querySelector('.i-label').value = d.label || '';
+  line.querySelector('.i-value').value = d.value || '';
+  line.querySelector('button').onclick = () => line.remove();
+  $('identRows').appendChild(line);
+}
+$('addIdent').onclick = () => addIdentRow();
+
+function addRateRow(d){
+  d = d || {};
+  const line = el('div','rep-line rate-line');
+  line.innerHTML = '<input type="text" class="r-desc" placeholder="Line Haul">' +
+    '<input type="number" class="r-amt" step="0.01" placeholder="0.00">' +
+    '<button class="danger mini" type="button">Remove</button>';
+  line.querySelector('.r-desc').value = d.description || '';
+  line.querySelector('.r-amt').value = (d.amount ?? '');
+  line.querySelector('.r-amt').oninput = sumRate;
+  line.querySelector('button').onclick = () => { line.remove(); sumRate(); };
+  $('rateRows').appendChild(line);
+}
+$('addRate').onclick = () => addRateRow();
+$('rateTotal').oninput = () => { totalTouched = true; };
+function sumRate(){
+  if (totalTouched) return;
+  const amts = [...document.querySelectorAll('.r-amt')].map(i => parseFloat(i.value)).filter(n => !isNaN(n));
+  $('rateTotal').value = amts.length ? amts.reduce((a,b) => a+b, 0).toFixed(2) : '';
+}
+
+/* ------------------------------- stops --------------------------------- */
+function addStop(d){
+  d = d || {};
+  const box = el('div','stop');
+  if (d.id) box.dataset.stopId = d.id;
+  box.innerHTML =
+    '<div class="stop-head">' +
+      '<span class="stop-title"><span class="s-num"></span> · <span class="s-type"></span></span>' +
+      '<span class="rowbtns"><button class="ghost mini s-up" type="button">Up</button>' +
+      '<button class="ghost mini s-down" type="button">Down</button>' +
+      '<button class="danger mini s-del" type="button">Remove</button></span></div>' +
+    '<div class="row"><label>Type</label><select class="s-stype">' +
+      '<option value="pickup">Pickup</option><option value="delivery">Delivery</option></select></div>' +
+    '<div class="row"><label>Facility</label><input type="text" class="s-fac"></div>' +
+    '<div class="row"><label>Street</label><input type="text" class="s-addr" placeholder="leave blank if not stated"></div>' +
+    '<div class="grid2">' +
+      '<div class="row"><label>City</label><input type="text" class="s-city"></div>' +
+      '<div class="row"><label>State</label><input type="text" class="s-state"></div>' +
+      '<div class="row"><label>ZIP</label><input type="text" class="s-zip"></div>' +
+      '<div class="row"><label>Timezone</label><select class="s-tz">' +
+        '<option value="America/Los_Angeles">Pacific</option>' +
+        '<option value="America/Denver">Mountain</option>' +
+        '<option value="America/Phoenix">Arizona</option>' +
+        '<option value="America/Chicago">Central</option>' +
+        '<option value="America/New_York">Eastern</option></select></div>' +
+      '<div class="row"><label>Contact</label><input type="text" class="s-cname"></div>' +
+      '<div class="row"><label>Phone</label><input type="text" class="s-cphone"></div></div>' +
+    '<div class="grid2">' +
+      '<div class="row"><label>Appt type</label><select class="s-akind">' +
+        '<option value="appointment">Appointment</option><option value="window">Window</option>' +
+        '<option value="fcfs">FCFS</option></select></div>' +
+      '<div class="row"><label>Driver handles</label><select class="s-dload">' +
+        '<option value="">Not stated</option><option value="false">No touch</option>' +
+        '<option value="true">Driver load/unload</option></select></div>' +
+      '<div class="row"><label>Appt start</label><input type="datetime-local" class="s-start"></div>' +
+      '<div class="row"><label>Appt end</label><input type="datetime-local" class="s-end"></div>' +
+      '<div class="row"><label>Weight lb</label><input type="number" step="0.01" class="s-wt"></div>' +
+      '<div class="row"><label>Pallets</label><input type="number" class="s-plt"></div></div>' +
+    '<div class="sub-legend">Stop references</div><div class="rep s-refs"></div>' +
+    '<div class="actions"><button class="ghost mini s-addref" type="button">+ Reference</button></div>' +
+    '<div class="row"><label>Instructions</label><textarea class="s-inst"></textarea></div>';
+
+  const q = s => box.querySelector(s);
+  q('.s-stype').value = d.stop_type === 'delivery' ? 'delivery' : 'pickup';
+  q('.s-fac').value = d.facility_name || '';
+  q('.s-addr').value = d.address_line1 || '';
+  q('.s-city').value = d.city || '';
+  q('.s-state').value = d.state || '';
+  q('.s-zip').value = d.zip || '';
+  q('.s-tz').value = d.appt_timezone || 'America/Los_Angeles';
+  q('.s-cname').value = d.contact_name || '';
+  q('.s-cphone').value = d.contact_phone || '';
+  q('.s-akind').value = d.appt_kind || 'appointment';
+  q('.s-start').value = (d.appt_local_start || '').slice(0,16);
+  q('.s-end').value = (d.appt_local_end || '').slice(0,16);
+  q('.s-wt').value = (d.weight_lbs ?? '');
+  q('.s-plt').value = (d.pallets ?? '');
+  q('.s-inst').value = d.instructions || '';
+  q('.s-dload').value = d.driver_load === true ? 'true' : d.driver_load === false ? 'false' : '';
+
+  const refBox = q('.s-refs');
+  function addRef(r){
+    r = r || {};
+    const line = el('div','rep-line ref-line');
+    line.innerHTML = '<input type="text" class="f-label" placeholder="PO">' +
+      '<input type="text" class="f-value" placeholder="0156509891">' +
+      '<button class="danger mini" type="button">Remove</button>';
+    line.querySelector('.f-label').value = r.label || '';
+    line.querySelector('.f-value').value = r.value || '';
+    line.querySelector('button').onclick = () => line.remove();
+    refBox.appendChild(line);
+  }
+  (d.refs || []).forEach(addRef);
+  q('.s-addref').onclick = () => addRef();
+  q('.s-del').onclick = () => { box.remove(); renumber(); };
+  q('.s-up').onclick = () => { const p = box.previousElementSibling; if (p) box.parentNode.insertBefore(box, p); renumber(); };
+  q('.s-down').onclick = () => { const n = box.nextElementSibling; if (n) box.parentNode.insertBefore(n, box); renumber(); };
+  q('.s-stype').onchange = renumber;
+  $('stopRows').appendChild(box);
+  renumber();
+}
+function renumber(){
+  [...document.querySelectorAll('.stop')].forEach((s,i) => {
+    s.querySelector('.s-num').textContent = 'Stop ' + (i+1);
+    s.querySelector('.s-type').textContent = s.querySelector('.s-stype').value;
+  });
+}
+$('addPickup').onclick = () => addStop({ stop_type:'pickup' });
+$('addDelivery').onclick = () => addStop({ stop_type:'delivery' });
+
+/* --------------------------- clear / fill form -------------------------- */
+function clearForm(){
+  ['b_name','b_contact','b_phone','b_email','b_after','equip','commodity','tmin','tmax',
+   'tnote','weight','pallets','rateTotal','trackPlat','special'].forEach(id => $(id).value = '');
+  $('trackReq').value = 'false';
+  $('identRows').innerHTML = ''; $('rateRows').innerHTML = ''; $('stopRows').innerHTML = '';
+  $('flags').innerHTML = ''; $('notesBox').innerHTML = '';
+  totalTouched = false;
+}
+$('clear').onclick = () => { clearForm(); setStatus($('parseStatus'), 'Form cleared.', ''); };
+
+function fillForm(p){
+  clearForm();
+  const b = p.broker || {};
+  $('b_name').value = b.name || ''; $('b_contact').value = b.contact || '';
+  $('b_phone').value = b.phone || ''; $('b_email').value = b.email || '';
+  $('b_after').value = b.after_hours || '';
+  $('equip').value = p.equipment_type || ''; $('commodity').value = p.commodity || '';
+  $('tmin').value = (p.temp_min_f ?? ''); $('tmax').value = (p.temp_max_f ?? '');
+  $('tnote').value = p.temp_note || '';
+  $('weight').value = (p.total_weight_lbs ?? ''); $('pallets').value = (p.total_pallets ?? '');
+  $('trackReq').value = p.tracking_required ? 'true' : 'false';
+  $('trackPlat').value = p.tracking_platform || '';
+  $('special').value = p.special_instructions || '';
+  (p.identifiers || []).forEach(addIdentRow);
+  (p.rate_lines || []).forEach(addRateRow);
+  if (p.rate_total != null){ totalTouched = true; $('rateTotal').value = p.rate_total; }
+  (p.stops || []).forEach(addStop);
+  if (p.confidence || p.needs_review) renderFlags(p);
+}
+
+function renderFlags(p){
+  const box = $('flags'); box.innerHTML = '';
+  const add = (t, cls) => { const s = el('span','flag ' + cls); s.textContent = t; box.appendChild(s); };
+  const stops = (p.stops || []).length;
+  add(stops + ' stop' + (stops === 1 ? '' : 's'), stops ? 'ok' : 'bad');
+  add(p.rate_total == null ? 'no rate on document' : 'rate $' + p.rate_total, p.rate_total == null ? 'warn' : 'ok');
+  const c = p.confidence && p.confidence.overall;
+  if (c != null) add('confidence ' + c, c < 0.85 ? 'warn' : 'ok');
+  const noAddr = (p.stops || []).filter(s => !s.address_line1).length;
+  if (noAddr) add(noAddr + ' missing address', 'warn');
+  const nb = $('notesBox'); nb.innerHTML = '';
+  if (p.needs_review && (p.review_notes || []).length){
+    const d = el('div','notes');
+    d.innerHTML = '<h4>Check before saving</h4><ul>' + p.review_notes.map(n => '<li>' + esc(n) + '</li>').join('') + '</ul>';
+    nb.appendChild(d);
+  }
+}
+
+/* ------------------------------ parse PDF ------------------------------ */
+$('parse').onclick = async () => {
+  if (!token) return setStatus($('parseStatus'), 'Sign in first.', 'fail');
+  const f = $('file').files[0];
+  if (!f) return setStatus($('parseStatus'), 'Choose a PDF first.', 'fail');
+  const name = f.name.replace(/[^A-Za-z0-9._-]/g, '_');
+  $('parse').disabled = true;
+  try {
+    setStatus($('parseStatus'), 'Uploading…', 'busy');
+    const up = await fetch(base() + '/storage/v1/object/rate-cons/' + encodeURIComponent(name), {
+      method:'POST',
+      headers:{ 'apikey':anon(), 'Authorization':'Bearer '+token, 'Content-Type':'application/pdf', 'x-upsert':'true' },
+      body: f
+    });
+    if (!up.ok) throw new Error('Upload failed: ' + (await up.text()));
+    setStatus($('parseStatus'), 'Parsing — 15 to 30 seconds…', 'busy');
+    const d = await api('/functions/v1/parse-rc', { method:'POST', body: JSON.stringify({ path: name }) });
+    lastPath = name;
+    fillForm(d.parsed);
+    setStatus($('parseStatus'), 'Parsed. Review every field, then save.', 'ok');
+  } catch(e){
+    setStatus($('parseStatus'), String(e.message).slice(0,300), 'fail');
+  } finally { $('parse').disabled = false; }
+};
+
+/* ------------------------------- collect ------------------------------- */
+function collect(){
+  const idents = [...document.querySelectorAll('#identRows .rep-line')].map(l => ({
+    label: val(l.querySelector('.i-label')), value: val(l.querySelector('.i-value'))
+  })).filter(x => x.label || x.value);
+
+  const rates = [...document.querySelectorAll('#rateRows .rep-line')].map(l => ({
+    description: val(l.querySelector('.r-desc')), amount: num(l.querySelector('.r-amt'))
+  })).filter(x => x.description || x.amount != null);
+
+  const stops = [...document.querySelectorAll('.stop')].map((s,i) => {
+    const q = sel => s.querySelector(sel);
+    const dl = val(q('.s-dload'));
+    return {
+      id: s.dataset.stopId || null,
+      seq: i + 1, stop_type: q('.s-stype').value,
+      facility_name: val(q('.s-fac')), address_line1: val(q('.s-addr')),
+      city: val(q('.s-city')), state: val(q('.s-state')), zip: val(q('.s-zip')),
+      contact_name: val(q('.s-cname')), contact_phone: val(q('.s-cphone')),
+      appt_kind: q('.s-akind').value,
+      appt_local_start: dt(q('.s-start')), appt_local_end: dt(q('.s-end')),
+      appt_timezone: q('.s-tz').value,
+      refs: [...s.querySelectorAll('.s-refs .rep-line')].map(l => ({
+        label: val(l.querySelector('.f-label')), value: val(l.querySelector('.f-value'))
+      })).filter(x => x.label || x.value),
+      weight_lbs: num(q('.s-wt')), pallets: int(q('.s-plt')), pieces: null,
+      driver_load: dl === null ? null : dl === 'true',
+      instructions: val(q('.s-inst'))
+    };
+  });
+
+  return {
+    broker: { name: val($('b_name')), contact: val($('b_contact')), phone: val($('b_phone')),
+              email: val($('b_email')), after_hours: val($('b_after')) },
+    identifiers: idents, equipment_type: val($('equip')), commodity: val($('commodity')),
+    temp_min_f: num($('tmin')), temp_max_f: num($('tmax')), temp_note: val($('tnote')),
+    total_weight_lbs: num($('weight')), total_pallets: int($('pallets')),
+    rate_lines: rates, rate_total: num($('rateTotal')),
+    tracking_required: $('trackReq').value === 'true', tracking_platform: val($('trackPlat')),
+    special_instructions: val($('special')), rc_file_path: lastPath, stops
+  };
+}
+
+/* ------------------------------ edit mode ------------------------------ */
+function enterEdit(id){
+  editingId = id;
+  $('editBanner').classList.remove('hide');
+  $('parseBox').classList.add('hide');
+  $('save').textContent = 'Save changes';
+  $('tabNew').textContent = 'Edit load';
+}
+function exitEdit(){
+  editingId = null;
+  $('editBanner').classList.add('hide');
+  $('parseBox').classList.remove('hide');
+  $('save').textContent = 'Create load';
+  $('tabNew').textContent = 'New load';
+  clearForm(); lastPath = null;
+}
+$('cancelEdit').onclick = () => { exitEdit(); show('List'); };
+
+async function openEdit(id){
+  setStatus($('listStatus'), 'Opening…', 'busy');
+  try {
+    const rows = await api('/rest/v1/loads?id=eq.' + id + '&select=*,stops(*)&limit=1');
+    const l = rows[0];
+    if (!l) throw new Error('Load not found');
+    const stops = (l.stops || []).slice().sort((a,b) => a.seq - b.seq).map(s => ({
+      id: s.id, seq: s.seq, stop_type: s.stop_type, facility_name: s.facility_name,
+      address_line1: s.address_line1, city: s.city, state: s.state, zip: s.zip,
+      contact_name: s.contact_name, contact_phone: s.contact_phone,
+      appt_kind: s.appt_kind, appt_timezone: s.appt_timezone,
+      appt_local_start: toLocalInput(s.appt_start, s.appt_timezone),
+      appt_local_end: toLocalInput(s.appt_end, s.appt_timezone),
+      refs: s.refs || [], weight_lbs: s.weight_lbs, pallets: s.pallets,
+      driver_load: s.driver_load, instructions: s.instructions
+    }));
+    fillForm({
+      broker: { name: l.broker_name, contact: l.broker_contact, phone: l.broker_phone,
+                email: l.broker_email, after_hours: l.broker_after_hours },
+      identifiers: l.identifiers || [], equipment_type: l.equipment_type, commodity: l.commodity,
+      temp_min_f: l.temp_min_f, temp_max_f: l.temp_max_f,
+      total_weight_lbs: l.total_weight_lbs, total_pallets: l.total_pallets,
+      rate_lines: l.rate_lines || [], rate_total: l.rate_total,
+      tracking_required: l.tracking_required, tracking_platform: l.tracking_platform,
+      special_instructions: l.special_instructions, stops
+    });
+    enterEdit(id);
+    show('New');
+    setStatus($('saveStatus'), 'Editing. Assignment and status are unchanged by saving.', '');
+  } catch(e){ setStatus($('listStatus'), String(e.message), 'fail'); }
+}
+
+/* --------------------------------- save -------------------------------- */
+$('save').onclick = async () => {
+  if (!token) return setStatus($('saveStatus'), 'Sign in first.', 'fail');
+  const payload = collect();
+  if (!payload.broker.name) return setStatus($('saveStatus'), 'Broker name is required.', 'fail');
+  if (!payload.stops.length) return setStatus($('saveStatus'), 'Add at least one stop.', 'fail');
+  const noTime = payload.stops.filter(s => !s.appt_local_start).length;
+  if (noTime && !confirm(noTime + ' stop(s) have no appointment time. Save anyway?')) return;
+
+  $('save').disabled = true;
+  setStatus($('saveStatus'), 'Saving…', 'busy');
+  try {
+    if (editingId){
+      await api('/rest/v1/rpc/update_load', {
+        method:'POST', body: JSON.stringify({ p_load_id: editingId, payload })
+      });
+      setStatus($('saveStatus'), 'Changes saved.', 'ok');
+      exitEdit(); show('List');
+    } else {
+      await api('/rest/v1/rpc/commit_parsed_load', { method:'POST', body: JSON.stringify({ payload }) });
+      setStatus($('saveStatus'), 'Load created. Assign it from the Loads tab.', 'ok');
+      clearForm(); lastPath = null; $('file').value = '';
+    }
+  } catch(e){
+    setStatus($('saveStatus'), String(e.message).slice(0,300), 'fail');
+  } finally { $('save').disabled = false; }
+};
+
+/* ------------------------------- drivers ------------------------------- */
+$('genPw').onclick = () => {
+  const cs = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let s = ''; const a = new Uint32Array(12); crypto.getRandomValues(a);
+  for (const n of a) s += cs[n % cs.length];
+  $('d_pw').value = s;
+};
+
+$('createDriver').onclick = async () => {
+  if (!token) return setStatus($('driverStatus'), 'Sign in first.', 'fail');
+  const body = {
+    full_name: val($('d_name')), email: val($('d_email')), password: $('d_pw').value,
+    phone: val($('d_phone')), tractor_number: val($('d_tractor')), trailer_number: val($('d_trailer'))
+  };
+  if (!body.full_name || !body.email) return setStatus($('driverStatus'), 'Name and email are required.', 'fail');
+  if ((body.password || '').length < 8) return setStatus($('driverStatus'), 'Password must be 8+ characters.', 'fail');
+  $('createDriver').disabled = true;
+  setStatus($('driverStatus'), 'Creating…', 'busy');
+  try {
+    await api('/functions/v1/create-driver', { method:'POST', body: JSON.stringify(body) });
+    setStatus($('driverStatus'), 'Created ' + body.full_name + '. Give them the email and password now.', 'ok');
+    ['d_name','d_email','d_phone','d_tractor','d_trailer'].forEach(id => $(id).value = '');
+    await loadDrivers();
+  } catch(e){
+    setStatus($('driverStatus'), String(e.message).slice(0,200), 'fail');
+  } finally { $('createDriver').disabled = false; }
+};
+
+$('refreshDrivers').onclick = () => loadDrivers();
+
+async function loadDrivers(quiet){
+  if (!token) return;
+  if (!quiet) setStatus($('rosterStatus'), 'Loading…', 'busy');
+  try {
+    drivers = await api('/rest/v1/profiles?select=id,full_name,email,phone,tractor_number,trailer_number,active' +
+                        '&role=eq.driver&order=full_name.asc');
+    renderDrivers();
+    if (!quiet) setStatus($('rosterStatus'), drivers.length + ' driver' + (drivers.length===1?'':'s') + '.', 'ok');
+  } catch(e){ setStatus($('rosterStatus'), String(e.message), 'fail'); }
+}
+
+function renderDrivers(){
+  const box = $('driverBox');
+  if (!drivers.length){ box.innerHTML = '<div class="empty">No drivers yet.</div>'; return; }
+  let h = '<table><thead><tr><th>Name</th><th class="no-sm">Email</th><th>Mobile</th>' +
+          '<th class="no-sm">Tractor</th><th>Status</th></tr></thead><tbody>';
+  for (const d of drivers){
+    h += '<tr><td>' + esc(d.full_name) + '</td><td class="lane no-sm">' + esc(d.email || '—') + '</td>' +
+         '<td class="lane">' + esc(d.phone || '—') + '</td>' +
+         '<td class="lane no-sm">' + esc(d.tractor_number || '—') + '</td>' +
+         '<td><span class="pill ' + (d.active ? 'st-assigned' : 'st-cancelled') + '">' +
+         (d.active ? 'active' : 'inactive') + '</span></td></tr>';
+  }
+  box.innerHTML = h + '</tbody></table>';
+}
+
+/* -------------------------------- loads -------------------------------- */
+$('refresh').onclick = () => loadList();
+$('filterStatus').onchange = () => loadList();
+
+const STATUSES = ['draft','unassigned','assigned','in_progress','delivered','completed','cancelled'];
+
+async function loadList(){
+  if (!token) return setStatus($('listStatus'), 'Sign in first.', 'fail');
+  setStatus($('listStatus'), 'Loading…', 'busy');
+  try {
+    if (!drivers.length) await loadDrivers(true);
+    const f = $('filterStatus').value;
+    const sel = 'id,broker_name,status,rate_total,assigned_driver_id,lane,first_appt,stop_count';
+    const rows = await api('/rest/v1/load_summary?select=' + encodeURIComponent(sel) +
+                  (f ? '&status=eq.' + f : '') + '&order=first_appt.asc.nullslast&limit=200');
+    renderList(rows);
+    setStatus($('listStatus'), rows.length + ' load' + (rows.length===1?'':'s') + '.', 'ok');
+  } catch(e){ setStatus($('listStatus'), String(e.message), 'fail'); }
+}
+
+function renderList(rows){
+  const box = $('listBox');
+  if (!rows.length){ box.innerHTML = '<div class="empty">No loads match.</div>'; return; }
+
+  let h = '<table><thead><tr><th>Broker</th><th class="no-sm">Lane</th><th>Appt</th>' +
+          '<th>Driver</th><th>Status</th><th class="money no-sm">Rate</th><th></th></tr></thead><tbody>';
+  for (const l of rows){
+    const dOpts = ['<option value="">— unassigned —</option>'].concat(
+      drivers.map(d => '<option value="' + d.id + '"' +
+        (d.id === l.assigned_driver_id ? ' selected' : '') + '>' + esc(d.full_name) + '</option>')).join('');
+    const sOpts = STATUSES.map(s => '<option value="' + s + '"' +
+        (s === l.status ? ' selected' : '') + '>' + s.replace('_',' ') + '</option>').join('');
+    h += '<tr>' +
+      '<td><span class="link edit" data-id="' + l.id + '">' + esc(l.broker_name) + '</span></td>' +
+      '<td class="lane no-sm">' + esc(l.lane || 'no stops') +
+        (l.stop_count > 2 ? ' (' + l.stop_count + ')' : '') + '</td>' +
+      '<td>' + esc(fmtAppt(l.first_appt)) + '</td>' +
+      '<td><select class="assign" data-load="' + l.id + '">' + dOpts + '</select></td>' +
+      '<td><select class="setstat" data-load="' + l.id + '">' + sOpts + '</select></td>' +
+      '<td class="money no-sm">' + (l.rate_total == null ? '<span class="lane">none</span>'
+        : '$' + Number(l.rate_total).toFixed(2)) + '</td>' +
+      '<td><button class="danger mini del" data-id="' + l.id +
+        '" data-broker="' + esc(l.broker_name) + '">Delete</button></td></tr>';
+  }
+  box.innerHTML = h + '</tbody></table>';
+
+  box.querySelectorAll('.edit').forEach(s => s.onclick = () => openEdit(s.dataset.id));
+
+  box.querySelectorAll('.assign').forEach(sel => {
+    sel.onchange = async () => {
+      sel.disabled = true;
+      setStatus($('listStatus'), sel.value ? 'Assigning…' : 'Unassigning…', 'busy');
+      try {
+        await api('/rest/v1/rpc/assign_load', { method:'POST',
+          body: JSON.stringify({ p_load_id: sel.dataset.load, p_driver_id: sel.value || null }) });
+        setStatus($('listStatus'), sel.value ? 'Assigned.' : 'Unassigned.', 'ok');
+        loadList();
+      } catch(e){ setStatus($('listStatus'), String(e.message), 'fail'); sel.disabled = false; }
+    };
+  });
+
+  box.querySelectorAll('.setstat').forEach(sel => {
+    sel.onchange = async () => {
+      sel.disabled = true;
+      setStatus($('listStatus'), 'Updating status…', 'busy');
+      try {
+        await api('/rest/v1/rpc/set_load_status', { method:'POST',
+          body: JSON.stringify({ p_load_id: sel.dataset.load, p_status: sel.value }) });
+        setStatus($('listStatus'), 'Status set to ' + sel.value.replace('_',' ') + '.', 'ok');
+        loadList();
+      } catch(e){ setStatus($('listStatus'), String(e.message), 'fail'); sel.disabled = false; }
+    };
+  });
+
+  box.querySelectorAll('.del').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.id;
+      let docs = 0;
+      try { docs = await api('/rest/v1/rpc/load_doc_count', { method:'POST', body: JSON.stringify({ p_load_id: id }) }); } catch {}
+      let msg = 'Permanently delete the ' + btn.dataset.broker + ' load?\n\n' +
+                'This removes its stops, arrival times and paperwork. It cannot be undone.\n' +
+                'To keep the record instead, set the status to cancelled.';
+      if (docs > 0) msg += '\n\nWARNING: ' + docs + ' driver-uploaded document(s) will be destroyed.';
+      if (!confirm(msg)) return;
+      setStatus($('listStatus'), 'Deleting…', 'busy');
+      try {
+        await api('/rest/v1/rpc/delete_load', { method:'POST', body: JSON.stringify({ p_load_id: id }) });
+        setStatus($('listStatus'), 'Deleted.', 'ok');
+        if (editingId === id) exitEdit();
+        loadList();
+      } catch(e){ setStatus($('listStatus'), String(e.message), 'fail'); }
+    };
+  });
+}
+
+/* -------------------------------- board -------------------------------- */
+$('refreshBoard').onclick = () => loadBoard();
+
+async function loadBoard(){
+  if (!token) return setStatus($('boardStatus'), 'Sign in first.', 'fail');
+  setStatus($('boardStatus'), 'Loading…', 'busy');
+  try {
+    const rows = await api('/rest/v1/driver_board?select=*&order=full_name.asc');
+    const box = $('boardBox');
+    box.innerHTML = rows.length
+      ? '<div class="board">' + rows.map(r =>
+          '<div class="card"><h3>' + esc(r.full_name) +
+            (r.tractor_number ? ' <span style="color:var(--dim);font-weight:400">#' + esc(r.tractor_number) + '</span>' : '') +
+          '</h3>' +
+          slot('Running now', r.current_broker, r.current_lane, r.current_first_appt) +
+          slot('Next up', r.next_broker, r.next_lane, r.next_first_appt) +
+          slot('Last delivered', r.last_broker, r.last_lane, r.last_delivered_appt) +
+          '<div class="slot"><span class="k">Open loads</span><div class="v">' + (r.open_loads || 0) + '</div></div>' +
+          '</div>').join('') + '</div>'
+      : '<div class="empty">No drivers yet. Add one from the Drivers tab.</div>';
+    setStatus($('boardStatus'), rows.length + ' driver' + (rows.length===1?'':'s') + '.', 'ok');
+  } catch(e){ setStatus($('boardStatus'), String(e.message), 'fail'); }
+}
+
+function slot(k, broker, lane, appt){
+  const has = !!broker;
+  return '<div class="slot"><span class="k">' + k + '</span><div class="v' + (has ? '' : ' none') + '">' +
+    (has ? esc(broker) + '<br><span class="lane">' + esc(lane || '') + ' · ' + esc(fmtAppt(appt)) + '</span>' : 'nothing') +
+    '</div></div>';
+}
+
+/* -------------------------------- export ------------------------------- */
+$('preview').onclick = () => runExport();
+
+async function runExport(){
+  if (!token) return setStatus($('exportStatus'), 'Sign in first.', 'fail');
+  setStatus($('exportStatus'), 'Loading…', 'busy');
+  try {
+    let q = '/rest/v1/load_billing?select=*&order=invoice_date.asc,invoice_no.asc,sort_group.asc';
+    const from = val($('x_from')), to = val($('x_to'));
+    if (from) q += '&invoice_date=gte.' + from;
+    if (to)   q += '&invoice_date=lte.' + to;
+    exportRows = await api(q);
+    renderExport();
+    $('download').disabled = !exportRows.length;
+    const invoices = new Set(exportRows.map(r => r.invoice_no)).size;
+    setStatus($('exportStatus'), exportRows.length + ' line(s) across ' + invoices + ' invoice(s).',
+              exportRows.length ? 'ok' : '');
+  } catch(e){ setStatus($('exportStatus'), String(e.message), 'fail'); }
+}
+
+function renderExport(){
+  const box = $('exportBox');
+  if (!exportRows.length){
+    box.innerHTML = '<div class="empty">Nothing to bill in that range. Loads must be delivered or completed.</div>';
+    return;
+  }
+  let h = '<table><thead><tr><th>Invoice</th><th>Customer</th><th class="no-sm">Date</th>' +
+          '<th class="no-sm">Description</th><th class="money">Amount</th></tr></thead><tbody>';
+  let total = 0;
+  for (const r of exportRows){
+    total += Number(r.item_amount || 0);
+    h += '<tr><td>' + esc(r.invoice_no) + '</td><td>' + esc(r.customer) + '</td>' +
+         '<td class="lane no-sm">' + esc(r.invoice_date || '—') + '</td>' +
+         '<td class="lane no-sm">' + esc(r.item_description) + '</td>' +
+         '<td class="money">$' + Number(r.item_amount || 0).toFixed(2) + '</td></tr>';
+  }
+  box.innerHTML = h + '</tbody><tfoot><tr><td colspan="4" style="text-align:right;color:var(--dim)">TOTAL</td>' +
+       '<td class="money" style="color:var(--sodium)">$' + total.toFixed(2) + '</td></tr></tfoot></table>';
+}
+
+$('download').onclick = () => {
+  const cols = ['Invoice No','Customer','Invoice Date','Due Date','Item(Product/Service)',
+                'Item Description','Item Quantity','Item Rate','Item Amount'];
+  const mdy = d => { if (!d) return ''; const p = String(d).split('-'); return p[1] + '/' + p[2] + '/' + p[0]; };
+  const clean = s => String(s ?? '').replace(/[",#%&]/g, ' ').replace(/\s+/g, ' ').trim();
+  const lines = [cols.join(',')];
+  for (const r of exportRows){
+    lines.push([clean(r.invoice_no), clean(r.customer), mdy(r.invoice_date), mdy(r.due_date),
+      clean(r.item), clean(r.item_description), 1,
+      Number(r.item_rate || 0).toFixed(2), Number(r.item_amount || 0).toFixed(2)].join(','));
+  }
+  const blob = new Blob([lines.join('\r\n')], { type:'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'quickbooks-invoices-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click(); URL.revokeObjectURL(a.href);
+  setStatus($('exportStatus'), 'Downloaded.', 'ok');
+};
+
+/* ------------------------------ PWA install ---------------------------- */
+if ('serviceWorker' in navigator && location.protocol === 'https:'){
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); deferredPrompt = e;
+  $('installBar').style.display = 'flex';
+});
+$('installBtn').onclick = async () => {
+  $('installBar').style.display = 'none';
+  if (deferredPrompt){ deferredPrompt.prompt(); deferredPrompt = null; }
+};
+$('installDismiss').onclick = () => { $('installBar').style.display = 'none'; };
+</script>
+</body>
+</html>
