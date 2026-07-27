@@ -158,11 +158,11 @@
     <h1>Cal Fresh Dispatch</h1>
     <p class="sub">Rate confirmations in, dispatched loads out.</p>
     <nav>
-      <button id="tabNew" class="ghost">New load</button>
-      <button id="tabList" class="ghost">Loads</button>
-      <button id="tabBoard" class="ghost">Board</button>
-      <button id="tabDrivers" class="ghost">Drivers</button>
-      <button id="tabExport" class="ghost">Billing</button>
+      <button id="tabNew" class="ghost hide">New load</button>
+      <button id="tabList" class="ghost hide">Loads</button>
+      <button id="tabBoard" class="ghost hide">Board</button>
+      <button id="tabDrivers" class="ghost hide">Drivers</button>
+      <button id="tabExport" class="ghost hide">Billing</button>
       <button id="tabConn" class="on">Account</button>
     </nav>
   </header>
@@ -177,6 +177,7 @@
         <input type="password" id="pw" autocomplete="current-password"></div>
       <div class="actions">
         <button id="signin">Sign in</button>
+        <button class="ghost mini hide" id="signout">Sign out</button>
         <button class="ghost mini" id="toggleAdv">Server settings</button>
         <span class="status" id="authStatus">Not signed in.</span>
       </div>
@@ -187,7 +188,7 @@
       </div>
     </fieldset>
 
-    <fieldset>
+    <fieldset id="numberingBox" class="hide">
       <legend>Load numbering</legend>
       <div class="row"><label for="nextLoadNo">Next load #</label>
         <input type="number" id="nextLoadNo" placeholder="sign in to read"></div>
@@ -482,15 +483,58 @@ $('signin').onclick = async () => {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error_description || d.msg || d.error || 'Sign-in failed');
     token = d.access_token;
-    setStatus($('authStatus'), 'Signed in.', 'ok');
+
+    // The server decides. Never trust anything the browser asserts here.
+    let role = 'unknown';
+    try { role = await api('/rest/v1/rpc/my_role', { method:'POST', body:'{}' }); } catch {}
+
+    if (role !== 'admin'){
+      token = null;
+      const why = role === 'driver'
+        ? 'This console is for dispatchers. Drivers use the driver app.'
+        : role === 'inactive'
+          ? 'That account has been deactivated.'
+          : 'That account is not set up for the dispatch console.';
+      throw new Error(why);
+    }
+
+    setAdminUi(true);
+    setStatus($('authStatus'), 'Signed in as ' + (val($('email')) || 'admin') + '.', 'ok');
     ['saveStatus','parseStatus','driverStatus'].forEach(i => setStatus($(i), 'Ready.', ''));
     await loadDrivers(true);
     loadNumbering();
     show('List');
   } catch(e){
     token = null;
+    setAdminUi(false);
     setStatus($('authStatus'), String(e.message), 'fail');
   } finally { $('signin').disabled = false; }
+};
+
+/* Show or hide everything that only a dispatcher should see. This is
+   convenience, not security — the database enforces the real rules. */
+function setAdminUi(on){
+  ['tabNew','tabList','tabBoard','tabDrivers','tabExport','numberingBox','signout']
+    .forEach(id => $(id).classList.toggle('hide', !on));
+  if (!on){
+    $('listBox').innerHTML = '<div class="empty">Nothing loaded yet.</div>';
+    $('boardBox').innerHTML = '<div class="empty">Nothing loaded yet.</div>';
+    $('driverBox').innerHTML = '<div class="empty">Nothing loaded yet.</div>';
+    $('exportBox').innerHTML = '';
+    $('gapBox').innerHTML = '';
+    $('nextLoadNo').value = '';
+    drivers = []; exportRows = [];
+    clearForm();
+  }
+}
+
+$('signout').onclick = () => {
+  token = null;
+  $('pw').value = '';
+  setAdminUi(false);
+  exitEdit();
+  show('Conn');
+  setStatus($('authStatus'), 'Signed out.', '');
 };
 
 /* ---------------------------- load numbering --------------------------- */
