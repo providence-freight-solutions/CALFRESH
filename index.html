@@ -186,6 +186,18 @@
         <div class="hint">Only change these if you point the app at a different project.</div>
       </div>
     </fieldset>
+
+    <fieldset>
+      <legend>Load numbering</legend>
+      <div class="row"><label for="nextLoadNo">Next load #</label>
+        <input type="number" id="nextLoadNo" placeholder="sign in to read"></div>
+      <div class="actions">
+        <button id="saveNumbering">Set starting number</button>
+        <span class="status" id="numStatus"></span>
+      </div>
+      <div class="hint">Applies to loads created from now on. Numbers already assigned stay put,
+        and the new value must be higher than any number in use.</div>
+    </fieldset>
   </section>
 
   <!-- ============================== NEW LOAD ============================= -->
@@ -207,6 +219,13 @@
       </div>
       <div class="flags" id="flags"></div>
       <div id="notesBox"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Load number</legend>
+      <div class="row"><label for="loadNo">Internal load #</label>
+        <input type="number" id="loadNo" placeholder="assigned automatically"></div>
+      <div class="hint">Blank takes the next number in sequence. This is the invoice number on export.</div>
     </fieldset>
 
     <fieldset>
@@ -466,11 +485,32 @@ $('signin').onclick = async () => {
     setStatus($('authStatus'), 'Signed in.', 'ok');
     ['saveStatus','parseStatus','driverStatus'].forEach(i => setStatus($(i), 'Ready.', ''));
     await loadDrivers(true);
+    loadNumbering();
     show('List');
   } catch(e){
     token = null;
     setStatus($('authStatus'), String(e.message), 'fail');
   } finally { $('signin').disabled = false; }
+};
+
+/* ---------------------------- load numbering --------------------------- */
+async function loadNumbering(){
+  try {
+    const n = await api('/rest/v1/rpc/get_next_load_number', { method:'POST', body:'{}' });
+    $('nextLoadNo').value = n;
+    setStatus($('numStatus'), 'Next load will be #' + n + '.', '');
+  } catch(e){ setStatus($('numStatus'), String(e.message).slice(0,160), 'fail'); }
+}
+
+$('saveNumbering').onclick = async () => {
+  if (!token) return setStatus($('numStatus'), 'Sign in first.', 'fail');
+  const n = int($('nextLoadNo'));
+  if (n == null) return setStatus($('numStatus'), 'Enter a number.', 'fail');
+  setStatus($('numStatus'), 'Saving\u2026', 'busy');
+  try {
+    await api('/rest/v1/rpc/set_next_load_number', { method:'POST', body: JSON.stringify({ p_next: n }) });
+    setStatus($('numStatus'), 'Next load will be #' + n + '.', 'ok');
+  } catch(e){ setStatus($('numStatus'), String(e.message).slice(0,200), 'fail'); }
 };
 
 /* --------------------------- repeatable rows --------------------------- */
@@ -599,7 +639,7 @@ $('addDelivery').onclick = () => addStop({ stop_type:'delivery' });
 
 /* --------------------------- clear / fill form -------------------------- */
 function clearForm(){
-  ['b_name','b_contact','b_phone','b_email','b_after','equip','commodity','tmin','tmax',
+  ['loadNo','b_name','b_contact','b_phone','b_email','b_after','equip','commodity','tmin','tmax',
    'tnote','weight','pallets','rateTotal','trackPlat','special'].forEach(id => $(id).value = '');
   $('trackReq').value = 'false';
   $('identRows').innerHTML = ''; $('rateRows').innerHTML = ''; $('stopRows').innerHTML = '';
@@ -610,6 +650,7 @@ $('clear').onclick = () => { clearForm(); setStatus($('parseStatus'), 'Form clea
 
 function fillForm(p){
   clearForm();
+  $('loadNo').value = (p.load_number ?? '');
   const b = p.broker || {};
   $('b_name').value = b.name || ''; $('b_contact').value = b.contact || '';
   $('b_phone').value = b.phone || ''; $('b_email').value = b.email || '';
@@ -703,6 +744,7 @@ function collect(){
   });
 
   return {
+    load_number: int($('loadNo')),
     broker: { name: val($('b_name')), contact: val($('b_contact')), phone: val($('b_phone')),
               email: val($('b_email')), after_hours: val($('b_after')) },
     identifiers: idents, equipment_type: val($('equip')), commodity: val($('commodity')),
@@ -749,6 +791,7 @@ async function openEdit(id){
       driver_load: s.driver_load, instructions: s.instructions
     }));
     fillForm({
+      load_number: l.load_number,
       broker: { name: l.broker_name, contact: l.broker_contact, phone: l.broker_phone,
                 email: l.broker_email, after_hours: l.broker_after_hours },
       identifiers: l.identifiers || [], equipment_type: l.equipment_type, commodity: l.commodity,
@@ -780,6 +823,10 @@ $('save').onclick = async () => {
       await api('/rest/v1/rpc/update_load', {
         method:'POST', body: JSON.stringify({ p_load_id: editingId, payload })
       });
+      if (payload.load_number != null){
+        await api('/rest/v1/rpc/set_load_number', { method:'POST',
+          body: JSON.stringify({ p_load_id: editingId, p_number: payload.load_number }) });
+      }
       setStatus($('saveStatus'), 'Changes saved.', 'ok');
       exitEdit(); show('List');
     } else {
@@ -930,7 +977,7 @@ async function loadList(){
     if (!drivers.length) await loadDrivers(true);
     syncDriverFilter();
     const f = $('filterStatus').value, dv = $('filterDriver').value;
-    const sel = 'id,broker_name,status,rate_total,assigned_driver_id,lane,first_appt,stop_count';
+    const sel = 'id,load_number,broker_name,status,rate_total,assigned_driver_id,lane,first_appt,stop_count';
     const rows = await api('/rest/v1/load_summary?select=' + encodeURIComponent(sel) +
                   (f ? '&status=eq.' + f : '') +
                   (dv ? '&assigned_driver_id=eq.' + dv : '') +
@@ -946,7 +993,7 @@ function renderList(rows){
   const box = $('listBox');
   if (!rows.length){ box.innerHTML = '<div class="empty">No loads match.</div>'; return; }
 
-  let h = '<table><thead><tr><th>Broker</th><th class="no-sm">Lane</th><th>Appt</th>' +
+  let h = '<table><thead><tr><th>Load #</th><th>Broker</th><th class="no-sm">Lane</th><th>Appt</th>' +
           '<th>Driver</th><th>Status</th><th class="money no-sm">Rate</th><th></th></tr></thead><tbody>';
   for (const l of rows){
     const dOpts = ['<option value="">— unassigned —</option>'].concat(
@@ -955,7 +1002,9 @@ function renderList(rows){
     const sOpts = STATUSES.map(s => '<option value="' + s + '"' +
         (s === l.status ? ' selected' : '') + '>' + s.replace('_',' ') + '</option>').join('');
     h += '<tr>' +
-      '<td><span class="link edit" data-id="' + l.id + '">' + esc(l.broker_name) + '</span></td>' +
+      '<td><span class="link edit" data-id="' + l.id + '">' +
+        (l.load_number != null ? l.load_number : '\u2014') + '</span></td>' +
+      '<td>' + esc(l.broker_name) + '</td>' +
       '<td class="lane no-sm">' + esc(l.lane || 'no stops') +
         (l.stop_count > 2 ? ' (' + l.stop_count + ')' : '') + '</td>' +
       '<td>' + esc(fmtAppt(l.first_appt)) + '</td>' +
@@ -1032,9 +1081,9 @@ async function loadBoard(){
             esc(r.full_name) + '</span>' +
             (r.tractor_number ? ' <span style="color:var(--dim);font-weight:400">#' + esc(r.tractor_number) + '</span>' : '') +
           '</h3>' +
-          slot('Running now', r.current_broker, r.current_lane, r.current_first_appt, r.current_load_id) +
-          slot('Next up', r.next_broker, r.next_lane, r.next_first_appt, r.next_load_id) +
-          slot('Last delivered', r.last_broker, r.last_lane, r.last_delivered_appt, r.last_load_id) +
+          slot('Running now', r.current_broker, r.current_lane, r.current_first_appt, r.current_load_id, r.current_load_number) +
+          slot('Next up', r.next_broker, r.next_lane, r.next_first_appt, r.next_load_id, r.next_load_number) +
+          slot('Last delivered', r.last_broker, r.last_lane, r.last_delivered_appt, r.last_load_id, r.last_load_number) +
           '<div class="slot"><span class="k">Open loads</span><div class="v">' + (r.open_loads || 0) + '</div></div>' +
           '</div>').join('') + '</div>'
       : '<div class="empty">No drivers yet. Add one from the Drivers tab.</div>';
@@ -1051,10 +1100,11 @@ async function loadBoard(){
   } catch(e){ setStatus($('boardStatus'), String(e.message), 'fail'); }
 }
 
-function slot(k, broker, lane, appt, loadId){
+function slot(k, broker, lane, appt, loadId, loadNo){
   if (!broker) return '<div class="slot"><span class="k">' + k + '</span><div class="v none">nothing</div></div>';
   return '<div class="slot"><span class="k">' + k + '</span><div class="v">' +
-    '<span class="link boardload" data-id="' + loadId + '">' + esc(broker) + '</span>' +
+    '<span class="link boardload" data-id="' + loadId + '">' +
+      (loadNo != null ? '#' + loadNo + ' ' : '') + esc(broker) + '</span>' +
     '<br><span class="lane">' + esc(lane || '') + ' · ' + esc(fmtAppt(appt)) + '</span></div></div>';
 }
 
@@ -1087,7 +1137,8 @@ async function showBillingGaps(){
     if (!gaps.length) return;
     box.innerHTML = '<div class="notes"><h4>' + gaps.length +
       ' delivered load(s) have no rate and will not be invoiced</h4><ul>' +
-      gaps.map(g => '<li><span class="link gapfix" data-id="' + g.id + '">' + esc(g.broker_name) +
+      gaps.map(g => '<li><span class="link gapfix" data-id="' + g.id + '">#' +
+        (g.load_number != null ? g.load_number : '?') + ' ' + esc(g.broker_name) +
         '</span> \u00b7 ' + esc(g.lane || '') + ' \u00b7 ' + esc(g.delivered_on || 'no date') + '</li>').join('') +
       '</ul></div>';
     box.querySelectorAll('.gapfix').forEach(a => a.onclick = () => openEdit(a.dataset.id));
