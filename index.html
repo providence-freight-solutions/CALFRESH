@@ -352,6 +352,7 @@
         <span class="status" id="exportStatus">Sign in to load.</span>
       </div>
       <div class="hint">Only <code>delivered</code> and <code>completed</code> loads appear.</div>
+      <div id="gapBox"></div>
       <div class="scroll" id="exportBox"></div>
     </fieldset>
   </section>
@@ -792,12 +793,13 @@ $('save').onclick = async () => {
 };
 
 /* ------------------------------- drivers ------------------------------- */
-$('genPw').onclick = () => {
+function genPassword(){
   const cs = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
   let s = ''; const a = new Uint32Array(12); crypto.getRandomValues(a);
   for (const n of a) s += cs[n % cs.length];
-  $('d_pw').value = s;
-};
+  return s;
+}
+$('genPw').onclick = () => { $('d_pw').value = genPassword(); };
 
 $('createDriver').onclick = async () => {
   if (!token) return setStatus($('driverStatus'), 'Sign in first.', 'fail');
@@ -836,15 +838,70 @@ function renderDrivers(){
   const box = $('driverBox');
   if (!drivers.length){ box.innerHTML = '<div class="empty">No drivers yet.</div>'; return; }
   let h = '<table><thead><tr><th>Name</th><th class="no-sm">Email</th><th>Mobile</th>' +
-          '<th class="no-sm">Tractor</th><th>Status</th></tr></thead><tbody>';
+          '<th>Status</th><th>Actions</th></tr></thead><tbody>';
   for (const d of drivers){
     h += '<tr><td>' + esc(d.full_name) + '</td><td class="lane no-sm">' + esc(d.email || '—') + '</td>' +
          '<td class="lane">' + esc(d.phone || '—') + '</td>' +
-         '<td class="lane no-sm">' + esc(d.tractor_number || '—') + '</td>' +
          '<td><span class="pill ' + (d.active ? 'st-assigned' : 'st-cancelled') + '">' +
-         (d.active ? 'active' : 'inactive') + '</span></td></tr>';
+         (d.active ? 'active' : 'inactive') + '</span></td>' +
+         '<td><span class="rowbtns">' +
+           '<button class="ghost mini d-toggle" data-id="' + d.id + '" data-active="' + d.active +
+             '" data-name="' + esc(d.full_name) + '">' + (d.active ? 'Deactivate' : 'Reactivate') + '</button>' +
+           '<button class="ghost mini d-pw" data-id="' + d.id + '" data-name="' + esc(d.full_name) + '">Reset password</button>' +
+           '<button class="danger mini d-del" data-id="' + d.id + '" data-name="' + esc(d.full_name) + '">Delete</button>' +
+         '</span></td></tr>';
   }
   box.innerHTML = h + '</tbody></table>';
+
+  box.querySelectorAll('.d-toggle').forEach(b => b.onclick = () => toggleDriver(b.dataset.id, b.dataset.active !== 'true', b.dataset.name));
+  box.querySelectorAll('.d-pw').forEach(b => b.onclick = () => resetDriverPw(b.dataset.id, b.dataset.name));
+  box.querySelectorAll('.d-del').forEach(b => b.onclick = () => deleteDriver(b.dataset.id, b.dataset.name));
+}
+
+async function toggleDriver(id, makeActive, name){
+  setStatus($('rosterStatus'), 'Updating\u2026', 'busy');
+  try {
+    await api('/rest/v1/profiles?id=eq.' + id, {
+      method:'PATCH',
+      headers: Object.assign(headers(), { 'Prefer':'return=minimal' }),
+      body: JSON.stringify({ active: makeActive })
+    });
+    setStatus($('rosterStatus'), name + (makeActive ? ' reactivated.' : ' deactivated. They can no longer be assigned loads.'), 'ok');
+    await loadDrivers(true); renderDrivers();
+  } catch(e){ setStatus($('rosterStatus'), String(e.message), 'fail'); }
+}
+
+async function resetDriverPw(id, name){
+  const pw = genPassword();
+  if (!confirm('Set a new password for ' + name + '?\n\n' + pw +
+               '\n\nWrite it down now. It cannot be read back later.')) return;
+  setStatus($('rosterStatus'), 'Resetting\u2026', 'busy');
+  try {
+    await api('/functions/v1/driver-admin', { method:'POST',
+      body: JSON.stringify({ action:'reset_password', driver_id:id, password:pw }) });
+    setStatus($('rosterStatus'), 'New password for ' + name + ': ' + pw, 'ok');
+  } catch(e){ setStatus($('rosterStatus'), String(e.message).slice(0,220), 'fail'); }
+}
+
+async function deleteDriver(id, name){
+  let refs = {};
+  try { refs = await api('/rest/v1/rpc/driver_reference_count', { method:'POST', body: JSON.stringify({ p_driver_id:id }) }); } catch {}
+  const total = (refs.loads||0) + (refs.events||0) + (refs.documents||0) + (refs.accessorials||0);
+  if ((refs.loads||0) > 0){
+    return setStatus($('rosterStatus'),
+      name + ' is on ' + refs.loads + ' load(s). Reassign those first, or deactivate instead.', 'fail');
+  }
+  let msg = 'Permanently delete ' + name + '?\n\nTheir sign-in is removed and cannot be recovered.';
+  if (total > 0) msg += '\n\n' + total + ' history record(s) will go with them.';
+  msg += '\n\nDeactivating keeps the record and is usually the better choice.';
+  if (!confirm(msg)) return;
+  setStatus($('rosterStatus'), 'Deleting\u2026', 'busy');
+  try {
+    await api('/functions/v1/driver-admin', { method:'POST',
+      body: JSON.stringify({ action:'delete', driver_id:id }) });
+    setStatus($('rosterStatus'), name + ' deleted.', 'ok');
+    await loadDrivers();
+  } catch(e){ setStatus($('rosterStatus'), String(e.message).slice(0,220), 'fail'); }
 }
 
 /* -------------------------------- loads -------------------------------- */
@@ -859,7 +916,8 @@ $('clearFilters').onclick = () => {
 function syncDriverFilter(){
   const sel = $('filterDriver'), keep = sel.value;
   sel.innerHTML = '<option value="">All drivers</option>' +
-    drivers.map(d => '<option value="' + d.id + '">' + esc(d.full_name) + '</option>').join('');
+    drivers.map(d => '<option value="' + d.id + '">' + esc(d.full_name) +
+      (d.active ? '' : ' (inactive)') + '</option>').join('');
   sel.value = keep;
 }
 
@@ -892,7 +950,7 @@ function renderList(rows){
           '<th>Driver</th><th>Status</th><th class="money no-sm">Rate</th><th></th></tr></thead><tbody>';
   for (const l of rows){
     const dOpts = ['<option value="">— unassigned —</option>'].concat(
-      drivers.map(d => '<option value="' + d.id + '"' +
+      drivers.filter(d => d.active || d.id === l.assigned_driver_id).map(d => '<option value="' + d.id + '"' +
         (d.id === l.assigned_driver_id ? ' selected' : '') + '>' + esc(d.full_name) + '</option>')).join('');
     const sOpts = STATUSES.map(s => '<option value="' + s + '"' +
         (s === l.status ? ' selected' : '') + '>' + s.replace('_',' ') + '</option>').join('');
@@ -1013,11 +1071,27 @@ async function runExport(){
     if (to)   q += '&invoice_date=lte.' + to;
     exportRows = await api(q);
     renderExport();
+    await showBillingGaps();
     $('download').disabled = !exportRows.length;
     const invoices = new Set(exportRows.map(r => r.invoice_no)).size;
     setStatus($('exportStatus'), exportRows.length + ' line(s) across ' + invoices + ' invoice(s).',
               exportRows.length ? 'ok' : '');
   } catch(e){ setStatus($('exportStatus'), String(e.message), 'fail'); }
+}
+
+async function showBillingGaps(){
+  const box = $('gapBox');
+  box.innerHTML = '';
+  try {
+    const gaps = await api('/rest/v1/load_billing_gaps?select=*&order=delivered_on.asc');
+    if (!gaps.length) return;
+    box.innerHTML = '<div class="notes"><h4>' + gaps.length +
+      ' delivered load(s) have no rate and will not be invoiced</h4><ul>' +
+      gaps.map(g => '<li><span class="link gapfix" data-id="' + g.id + '">' + esc(g.broker_name) +
+        '</span> \u00b7 ' + esc(g.lane || '') + ' \u00b7 ' + esc(g.delivered_on || 'no date') + '</li>').join('') +
+      '</ul></div>';
+    box.querySelectorAll('.gapfix').forEach(a => a.onclick = () => openEdit(a.dataset.id));
+  } catch(e){ /* view may not exist until migration 005 is run */ }
 }
 
 function renderExport(){
