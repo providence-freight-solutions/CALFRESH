@@ -5,7 +5,7 @@
 // Bump CACHE when you deploy a new console build.
 // =====================================================================
 
-const CACHE = 'cf-console-v3';
+const CACHE = 'cf-console-v4';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
